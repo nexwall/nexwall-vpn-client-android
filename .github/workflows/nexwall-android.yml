@@ -1,0 +1,49 @@
+name: Nexwall Android build
+# Builds the Nexwall VPN APK and publishes it to the public pre-release "nightly".
+# Until a release keystore is configured the APK is debug-signed: fine for sideloading/testing, not for the Play Store.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Use debug signing
+        run: mkdir -p ~/.gradle && echo -e "icsopenvpnDebugSign=true\norg.gradle.jvmargs=-Xmx2048M" > ~/.gradle/gradle.properties
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - uses: actions/setup-java@v6
+        with:
+          java-version: 25
+          cache: 'gradle'
+          distribution: 'temurin'
+      - uses: android-actions/setup-android@v4
+      - name: Build
+        run: ./gradlew assembleUiOvpn23Release
+      - name: Collect APKs
+        run: |
+          find main/build/outputs -name '*.apk' | tee apks.txt
+          mkdir -p dist
+          while read f; do cp "$f" "dist/nexwall-vpn-android-${GITHUB_SHA::7}-$(basename "$f")"; done < apks.txt
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nexwall-vpn-android-apk
+          path: dist/*.apk
+      - name: Publish to the pre-release "nightly"
+        run: |
+          gh release view nightly >/dev/null 2>&1 || \
+            gh release create nightly --prerelease --target "$GITHUB_SHA" \
+              --title "Nexwall VPN for Android - test build" --notes "placeholder"
+          gh release upload nightly dist/*.apk --clobber
+          gh release edit nightly --prerelease --title "Nexwall VPN for Android - test build" \
+            --notes "Automatic test build of commit ${GITHUB_SHA::7}. Debug-signed (sideload only). Based on ics-openvpn (GPLv2); source in this repository."
