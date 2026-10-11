@@ -1,3 +1,5 @@
+**Nexwall VPN** is a branded, public fork of ics-openvpn for the Nexwall firewall SSL VPN. See BRANDING.md. Original README follows.
+
 OpenVPN for Android
 =============
 ![build status](https://github.com/schwabe/ics-openvpn/actions/workflows/build.yaml/badge.svg)
